@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#6d3db7">
+  <title>Anna's Sudoku</title>
+  <style>
+    :root{
+      --violet:#6d3db7;
+      --violet-dark:#4f248e;
+      --violet-soft:#eee6f8;
+      --green:#5b8f47;
+      --green-dark:#3f7130;
+      --green-soft:#e7f1e2;
+      --bg:#f7f6f9;
+      --card:#ffffff;
+      --text:#242126;
+      --muted:#716b76;
+      --grid:#2f2935;
+      --line:#cfc8d6;
+      --error:#b3261e;
+      --shadow:0 8px 28px rgba(40,25,55,.10);
+    }
+
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
+    body{
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      display:flex;justify-content:center;
+    }
+    button,select{font:inherit}
+    button{touch-action:manipulation}
+
+    .app{
+      width:min(100%,560px);
+      padding:16px 14px max(26px,env(safe-area-inset-bottom));
+    }
+
+    header{text-align:center;padding:8px 0 16px}
+    h1{margin:0;font-size:clamp(28px,7vw,36px);letter-spacing:-.7px}
+    .heart{color:var(--green)}
+    .subtitle{margin-top:6px;color:var(--muted);font-size:14px}
+
+    .card{
+      background:var(--card);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px;
+    }
+
+    .controls{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    .difficulty-wrap{
+      display:grid;
+      grid-template-columns:110px 1fr;
+      align-items:center;
+      gap:10px;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    select{
+      width:100%;
+      min-height:48px;
+      border:1px solid #ddd5e5;
+      border-radius:14px;
+      background:#faf8fc;
+      color:var(--text);
+      padding:0 12px;
+      font-weight:650;
+    }
+
+    #newGame{
+      min-height:54px;
+      border:0;
+      border-radius:15px;
+      background:linear-gradient(135deg,var(--violet),var(--violet-dark));
+      color:#fff;
+      font-weight:800;
+      font-size:17px;
+      box-shadow:0 5px 14px rgba(109,61,183,.24);
+    }
+
+    .meta{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin:3px 2px 12px;
+      color:var(--muted);
+      font-size:14px;
+      font-weight:600;
+    }
+
+    .board{
+      display:grid;
+      grid-template-columns:repeat(9,1fr);
+      width:100%;
+      aspect-ratio:1/1;
+      border:3px solid var(--grid);
+      border-radius:11px;
+      overflow:hidden;
+      background:#fff;
+      user-select:none;
+    }
+
+    .cell{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-width:0;
+      font-size:clamp(20px,6.1vw,32px);
+      font-weight:650;
+      border-right:1px solid var(--line);
+      border-bottom:1px solid var(--line);
+      background:#fff;
+      cursor:pointer;
+    }
+
+    .cell:nth-child(9n){border-right:0}
+    .cell:nth-last-child(-n+9){border-bottom:0}
+    .cell[data-col="2"], .cell[data-col="5"]{border-right:3px solid var(--grid)}
+    .cell[data-row="2"], .cell[data-row="5"]{border-bottom:3px solid var(--grid)}
+
+    .cell.fixed{color:#242126;font-weight:800}
+    .cell.user{color:var(--violet)}
+    .cell.selected{background:var(--violet-soft)}
+    .cell.same{background:#f5f0fa}
+    .cell.peer{background:#faf7fc}
+    .cell.error{color:var(--error);background:#fff0ef}
+
+    .numbers{
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:8px;
+      margin-top:14px;
+    }
+
+    .num,.erase{
+      min-height:50px;
+      border:0;
+      border-radius:13px;
+      background:var(--green-soft);
+      color:var(--green-dark);
+      font-weight:800;
+      font-size:20px;
+    }
+    .erase{font-size:14px;background:#f0edf3;color:var(--text)}
+
+    .actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .action{
+      min-height:46px;
+      border:1px solid #ddd5e5;
+      border-radius:13px;
+      background:#fff;
+      color:var(--violet-dark);
+      font-weight:750;
+    }
+
+    .status{
+      min-height:24px;
+      margin-top:12px;
+      text-align:center;
+      font-weight:700;
+      font-size:14px;
+    }
+    .ok{color:var(--green-dark)}
+    .bad{color:var(--error)}
+    .note{
+      text-align:center;
+      color:var(--muted);
+      font-size:12px;
+      margin-top:10px;
+      line-height:1.4;
+    }
+
+    @media (max-width:370px){
+      .app{padding-left:8px;padding-right:8px}
+      .card{padding:10px}
+      .difficulty-wrap{grid-template-columns:95px 1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Anna's Sudoku <span class="heart">♥</span></h1>
+      <div class="subtitle">Violett, Grün und jeden Tag ein neues Rätsel.</div>
+    </header>
+
+    <section class="card">
+      <div class="controls">
+        <div class="difficulty-wrap">
+          <label for="difficulty">Schwierigkeit</label>
+          <select id="difficulty">
+            <option value="easy">Leicht</option>
+            <option value="medium" selected>Mittel</option>
+            <option value="hard">Schwer</option>
+          </select>
+        </div>
+        <button id="newGame" type="button">＋ Neues Sudoku</button>
+      </div>
+
+      <div class="meta">
+        <span id="difficultyText">Mittel</span>
+        <span>⏱ <span id="timer">00:00</span></span>
+      </div>
+
+      <div id="board" class="board" aria-label="Sudoku"></div>
+
+      <div class="numbers" aria-label="Zahleneingabe">
+        <button class="num" type="button" data-n="1">1</button>
+        <button class="num" type="button" data-n="2">2</button>
+        <button class="num" type="button" data-n="3">3</button>
+        <button class="num" type="button" data-n="4">4</button>
+        <button class="num" type="button" data-n="5">5</button>
+        <button class="num" type="button" data-n="6">6</button>
+        <button class="num" type="button" data-n="7">7</button>
+        <button class="num" type="button" data-n="8">8</button>
+        <button class="num" type="button" data-n="9">9</button>
+        <button id="erase" class="erase" type="button">Löschen</button>
+      </div>
+
+      <div class="actions">
+        <button id="check" class="action" type="button">Prüfen</button>
+        <button id="hint" class="action" type="button">Hinweis</button>
+      </div>
+
+      <div id="status" class="status"></div>
+      <div class="note">Der aktuelle Spielstand bleibt auf diesem Gerät gespeichert.</div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+
+  const BASES = {
+    easy: {
+      puzzle: "530070000600195000098000060800060003400803001700020006060000280000419005000080079",
+      solution:"534678912672195348198342567859761423426853791713924856961537284287419635345286179"
+    },
+    medium: {
+      puzzle: "000260701680070090190004500820100040004602900050003028009300074040050036703018000",
+      solution:"435269781682571493197834562826195347374682915951743628519326874248957136763418259"
+    },
+    hard: {
+      puzzle: "000000907000420180000705026100904000050000040000507009920108000034059000507000000",
+      solution:"462831957795426183381795426173984265659312748248567319926178534834259671517643892"
+    }
+  };
+
+  const LABELS = {easy:"Leicht", medium:"Mittel", hard:"Schwer"};
+  const $ = id => document.getElementById(id);
+
+  const boardEl = $("board");
+  const timerEl = $("timer");
+  const statusEl = $("status");
+  const difficultyEl = $("difficulty");
+  const difficultyText = $("difficultyText");
+
+  let puzzle = [];
+  let solution = [];
+  let current = [];
+  let selected = null;
+  let elapsed = 0;
+  let timerId = null;
+  let completed = false;
+
+  function arr81(s){
+    return Array.from({length:9}, (_,r) =>
+      Array.from({length:9}, (_,c) => Number(s[r*9+c]))
+    );
+  }
+
+  function shuffle(a){
+    a = a.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function transformPair(puz, sol){
+    let p = arr81(puz), s = arr81(sol);
+
+    // 1) Ziffern zufällig umbenennen.
+    const digits = shuffle([1,2,3,4,5,6,7,8,9]);
+    const remap = g => g.map(row => row.map(v => v === 0 ? 0 : digits[v-1]));
+    p = remap(p); s = remap(s);
+
+    // 2) Reihen innerhalb der 3er-Bänder und die Bänder selbst mischen.
+    const bandOrder = shuffle([0,1,2]);
+    let rowOrder = [];
+    for(const b of bandOrder){
+      for(const r of shuffle([0,1,2])) rowOrder.push(b*3+r);
+    }
+    p = rowOrder.map(r => p[r].slice());
+    s = rowOrder.map(r => s[r].slice());
+
+    // 3) Spalten innerhalb der 3er-Stapel und die Stapel selbst mischen.
+    const stackOrder = shuffle([0,1,2]);
+    let colOrder = [];
+    for(const st of stackOrder){
+      for(const c of shuffle([0,1,2])) colOrder.push(st*3+c);
+    }
+    p = p.map(row => colOrder.map(c => row[c]));
+    s = s.map(row => colOrder.map(c => row[c]));
+
+    // 4) Gelegentlich transponieren.
+    if(Math.random() < .5){
+      const trans = g => Array.from({length:9},(_,r)=>
+        Array.from({length:9},(_,c)=>g[c][r])
+      );
+      p = trans(p); s = trans(s);
+    }
+
+    return {puzzle:p, solution:s};
+  }
+
+  function newGame(){
+    const diff = difficultyEl.value;
+    difficultyText.textContent = LABELS[diff];
+    statusEl.textContent = "";
+    statusEl.className = "status";
+    selected = null;
+    elapsed = 0;
+    completed = false;
+
+    const t = transformPair(BASES[diff].puzzle, BASES[diff].solution);
+    puzzle = t.puzzle;
+    solution = t.solution;
+    current = puzzle.map(row => row.slice());
+
+    render();
+    restartTimer();
+    save();
+  }
+
+  function render(){
+    boardEl.innerHTML = "";
+    for(let r=0;r<9;r++){
+      for(let c=0;c<9;c++){
+        const d = document.createElement("div");
+        d.className = "cell";
+        d.dataset.row = r;
+        d.dataset.col = c;
+
+        const v = current[r][c];
+        if(v){
+          d.textContent = v;
+          d.classList.add(puzzle[r][c] ? "fixed" : "user");
+        }
+
+        if(selected){
+          const sr=selected.r, sc=selected.c;
+          if(r===sr && c===sc) d.classList.add("selected");
+          else if(r===sr || c===sc ||
+             (Math.floor(r/3)===Math.floor(sr/3) && Math.floor(c/3)===Math.floor(sc/3))){
+            d.classList.add("peer");
+          }
+
+          const sv=current[sr][sc];
+          if(sv && v===sv && !(r===sr && c===sc)) d.classList.add("same");
+        }
+
+        d.addEventListener("click",()=>{
+          selected={r,c};
+          render();
+        });
+        boardEl.appendChild(d);
+      }
+    }
+  }
+
+  function input(n){
+    if(!selected || completed) return;
+    const {r,c}=selected;
+    if(puzzle[r][c] !== 0) return;
+    current[r][c]=n;
+    statusEl.textContent="";
+    statusEl.className="status";
+    render();
+    save();
+    if(isSolved()) finish();
+  }
+
+  function erase(){
+    if(!selected || completed) return;
+    const {r,c}=selected;
+    if(puzzle[r][c] !== 0) return;
+    current[r][c]=0;
+    statusEl.textContent="";
+    statusEl.className="status";
+    render(); save();
+  }
+
+  function check(){
+    let errors=0;
+    render();
+    [...boardEl.children].forEach(cell=>{
+      const r=Number(cell.dataset.row), c=Number(cell.dataset.col);
+      if(!puzzle[r][c] && current[r][c] && current[r][c]!==solution[r][c]){
+        cell.classList.add("error");
+        errors++;
+      }
+    });
+    if(errors){
+      statusEl.className="status bad";
+      statusEl.textContent=errors===1 ? "1 Fehler gefunden." : errors+" Fehler gefunden.";
+    }else{
+      statusEl.className="status ok";
+      statusEl.textContent=isSolved() ? "Perfekt gelöst! 🎉" : "Bis hierher ist alles richtig.";
+    }
+  }
+
+  function hint(){
+    if(completed) return;
+    const options=[];
+    for(let r=0;r<9;r++) for(let c=0;c<9;c++)
+      if(current[r][c]===0 || current[r][c]!==solution[r][c]) options.push({r,c});
+    if(!options.length) return;
+    const pos=options[Math.floor(Math.random()*options.length)];
+    current[pos.r][pos.c]=solution[pos.r][pos.c];
+    selected=pos;
+    statusEl.className="status ok";
+    statusEl.textContent="Ein Feld wurde richtig eingesetzt.";
+    render(); save();
+    if(isSolved()) finish();
+  }
+
+  function isSolved(){
+    for(let r=0;r<9;r++) for(let c=0;c<9;c++)
+      if(current[r][c]!==solution[r][c]) return false;
+    return true;
+  }
+
+  function finish(){
+    completed=true;
+    clearInterval(timerId);
+    statusEl.className="status ok";
+    statusEl.textContent="Geschafft, Anna! 💚💜";
+    save();
+  }
+
+  function fmt(sec){
+    const m=String(Math.floor(sec/60)).padStart(2,"0");
+    const s=String(sec%60).padStart(2,"0");
+    return m+":"+s;
+  }
+
+  function restartTimer(){
+    clearInterval(timerId);
+    timerEl.textContent=fmt(elapsed);
+    timerId=setInterval(()=>{
+      if(!completed){
+        elapsed++;
+        timerEl.textContent=fmt(elapsed);
+        if(elapsed%5===0) save();
+      }
+    },1000);
+  }
+
+  function save(){
+    try{
+      localStorage.setItem("annasSudokuV2", JSON.stringify({
+        puzzle,solution,current,selected,elapsed,completed,difficulty:difficultyEl.value
+      }));
+    }catch(e){}
+  }
+
+  function load(){
+    try{
+      const x=JSON.parse(localStorage.getItem("annasSudokuV2"));
+      if(!x || !x.puzzle || !x.solution || !x.current) return false;
+      puzzle=x.puzzle; solution=x.solution; current=x.current;
+      selected=x.selected || null;
+      elapsed=x.elapsed || 0;
+      completed=!!x.completed;
+      difficultyEl.value=x.difficulty || "medium";
+      difficultyText.textContent=LABELS[difficultyEl.value];
+      render();
+      if(completed){
+        timerEl.textContent=fmt(elapsed);
+        statusEl.className="status ok";
+        statusEl.textContent="Geschafft, Anna! 💚💜";
+      }else restartTimer();
+      return true;
+    }catch(e){ return false; }
+  }
+
+  document.querySelectorAll(".num").forEach(b=>
+    b.addEventListener("click",()=>input(Number(b.dataset.n)))
+  );
+  $("erase").addEventListener("click",erase);
+  $("check").addEventListener("click",check);
+  $("hint").addEventListener("click",hint);
+  $("newGame").addEventListener("click",newGame);
+  difficultyEl.addEventListener("change",()=>{
+    difficultyText.textContent=LABELS[difficultyEl.value];
+  });
+
+  if(!load()) newGame();
+})();
+</script>
+</body>
+</html>
